@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head<!-- Link to Web App Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS Web App Capability -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MBBS Tracker">
+
+<!-- iOS Touch Icon -->
+<link rel="apple-touch-icon" href="icon-192.png">>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MBBS Tracker</title>
+<style>
+/* iOS Core Styling */
+:root {
+    --bg: #f2f2f7; --card: #ffffff; --text: #000000; 
+    --text-sec: #8e8e93; --blue: #007aff; --green: #34c759; 
+    --red: #ff3b30; --orange: #ff9500; --border: #c6c6c8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+body { background: var(--bg); color: var(--text); padding-bottom: 90px; -webkit-tap-highlight-color: transparent; }
+
+/* Layout & Navigation */
+.header { background: var(--card); padding: 16px; font-size: 17px; font-weight: 600; text-align: center; border-bottom: 0.5px solid var(--border); position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+.header button { background: none; border: none; color: var(--blue); font-size: 16px; cursor: pointer; font-weight: 500; }
+.tab-content { display: none; padding: 16px; animation: fadeIn 0.2s ease-in-out; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Cards & Lists */
+.card { background: var(--card); border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+h2 { font-size: 20px; margin-bottom: 16px; letter-spacing: -0.5px; }
+.subject-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 0.5px solid var(--border); }
+.subject-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.stats { display: flex; flex-direction: column; flex-grow: 1; }
+.stats strong { font-size: 16px; margin-bottom: 2px; }
+.stats span { font-size: 13px; color: var(--text-sec); }
+.percentage { font-size: 18px; font-weight: 700; margin-top: 4px; }
+.safe { color: var(--green); }
+.warning { color: var(--orange); }
+.shortage { color: var(--red); }
+
+/* Buttons & Inputs */
+.controls { display: flex; gap: 8px; }
+.controls button { padding: 10px 16px; border-radius: 8px; border: none; font-size: 15px; font-weight: 600; color: white; cursor: pointer; transition: opacity 0.1s; }
+.controls button:active { opacity: 0.7; }
+.btn-present { background: var(--green); }
+.btn-absent { background: var(--red); }
+.btn-action { background: var(--blue); color: white; width: 100%; padding: 14px; border-radius: 10px; border: none; font-size: 16px; font-weight: 600; margin-bottom: 12px; cursor: pointer; }
+.btn-reset { background: var(--red); }
+.btn-small { background: var(--border); color: var(--text); border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-right: 4px; margin-top: 8px; }
+.btn-small.active-btn { background: var(--orange); color: white; font-weight: 600; }
+input[type="text"], input[type="date"] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 12px; font-size: 16px; background: var(--bg); }
+.active-ring { border: 2px solid var(--orange); padding: 12px; border-radius: 10px; margin: -12px -12px 14px -12px; }
+
+/* Bottom Nav */
+.nav-bar { position: fixed; bottom: 0; width: 100%; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-top: 0.5px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 10; }
+.nav-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sec); cursor: pointer; width: 20%; }
+.nav-item.active { color: var(--blue); }
+.icon { font-size: 22px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <span id="header-title">Dashboard</span>
+    <button onclick="undo()">Undo</button>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div id="dashboard" class="tab-content active">
+    <div class="card">
+        <h2>Overall Attendance</h2>
+        <div id="dash-overall" class="percentage" style="font-size: 32px;">0%</div>
+        <p style="color:var(--text-sec); font-size: 13px; margin-top: 4px;">Total Classes Attended</p>
+    </div>
+    <div id="active-posting-card" class="card" style="display:none;">
+        <h2>Currently Active Posting</h2>
+        <div id="active-posting-content"></div>
+    </div>
+</div>
+
+<!-- SUBJECTS TAB -->
+<div id="subjects" class="tab-content">
+    <div class="card" id="subjects-container"></div>
+    <button class="btn-action btn-reset" onclick="resetSubjects()">Reset Subjects to 0</button>
+</div>
+
+<!-- POSTINGS TAB -->
+<div id="postings" class="tab-content">
+    <div class="card">
+        <h2>Add Clinical Posting</h2>
+        <input type="text" id="new-posting-name" placeholder="Posting Name (e.g. Gen Surgery)">
+        <button class="btn-action" onclick="addPosting()">Add Posting</button>
+    </div>
+    <div class="card" id="postings-container"></div>
+</div>
+
+<!-- CALENDAR TAB -->
+<div id="calendar" class="tab-content">
+    <div class="card">
+        <h2>Monthly Log</h2>
+        <input type="date" id="cal-date" onchange="renderCalendarLog()">
+        <div id="cal-log-container" style="margin-top: 16px;"></div>
+    </div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div id="settings" class="tab-content">
+    <div class="card">
+        <h2>Device Sync</h2>
+        <button class="btn-action" onclick="exportData()">Export Data File</button>
+        <button class="btn-action" style="background:var(--text);" onclick="document.getElementById('import-file').click()">Import Data File</button>
+        <input type="file" id="import-file" style="display:none;" onchange="importData(event)" accept=".json">
+        <p style="font-size:13px; color:var(--text-sec); margin-top:12px; line-height: 1.4;">Use Export on your current device and Import on your secondary device to sync your attendance logs locally without API keys.</p>
+    </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="nav-bar">
+    <div class="nav-item active" onclick="switchTab('dashboard', this)">
+        <span class="icon">🏠</span><span>Home</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('subjects', this)">
+        <span class="icon">📚</span><span>Subjects</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('postings', this)">
+        <span class="icon">🏥</span><span>Postings</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('calendar', this)">
+        <span class="icon">📅</span><span>Calendar</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('settings', this)">
+        <span class="icon">⚙️</span><span>Settings</span>
+    </div>
+</div>
+
+<script>
+// INITIAL STATE (2nd Year MBBS Defaults)
+const DEFAULT_DATA = {
+    subjects: {
+        Pathology: { theory: { a:0, t:0, min:75 }, practical: { a:0, t:0, min:80 } },
+        Microbiology: { theory: { a:0, t:0, min:75 }, practical: { a:0, t:0, min:80 } },
+        Pharmacology: { theory: { a:0, t:0, min:75 }, practical: { a:0, t:0, min:80 } }
+    },
+    postings: {},
+    activePosting: null,
+    calendar: {}
+};
+
+// LOAD OR INIT DATA
+let appData = JSON.parse(localStorage.getItem('mbbs_tracker_v2')) || JSON.parse(JSON.stringify(DEFAULT_DATA));
+let historyStack = [];
+
+// MIGRATION: Ensure all practicals require 80%
+Object.keys(appData.subjects).forEach(sub => {
+    if(appData.subjects[sub].practical.min < 80) appData.subjects[sub].practical.min = 80;
+});
+
+// CORE LOGIC
+function saveState() {
+    historyStack.push(JSON.stringify(appData));
+    if(historyStack.length > 25) historyStack.shift();
+}
+
+function saveData() {
+    try {
+        localStorage.setItem('mbbs_tracker_v2', JSON.stringify(appData));
+    } catch (e) {
+        console.warn("Storage restricted (Private Browsing mode?)");
+    }
+    renderAll();
+}
+
+function undo() {
+    if(historyStack.length > 0) {
+        appData = JSON.parse(historyStack.pop());
+        saveData();
+    } else {
+        alert("Nothing left to undo!");
+    }
+}
+
+// CALENDAR SYNC
+function getTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function logToCalendar(name, status) {
+    const dateStr = getTodayStr();
+    if(!appData.calendar[dateStr]) appData.calendar[dateStr] = [];
+    appData.calendar[dateStr].push({ 
+        name, 
+        status, 
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+    });
+}
+
+function updateAttendance(category, name, type, isPresent) {
+    saveState();
+    if(category === 'subjects') {
+        appData.subjects[name][type].t++;
+        if(isPresent) appData.subjects[name][type].a++;
+        logToCalendar(`${name} (${type === 'theory' ? 'Theory' : 'Practical'})`, isPresent ? 'Present' : 'Absent');
+    } else if(category === 'postings') {
+        appData.postings[name].t++;
+        if(isPresent) appData.postings[name].a++;
+        logToCalendar(`Posting: ${name}`, isPresent ? 'Present' : 'Absent');
+    }
+    saveData();
+}
+
+function resetSubjects() {
+    if(!confirm("Are you sure you want to reset all subject attendance to 0? Postings will remain unaffected.")) return;
+    saveState();
+    Object.keys(appData.subjects).forEach(sub => {
+        appData.subjects[sub].theory = { a:0, t:0, min:75 };
+        appData.subjects[sub].practical = { a:0, t:0, min:80 };
+    });
+    saveData();
+}
+
+// POSTINGS LOGIC
+function addPosting() {
+    const name = document.getElementById('new-posting-name').value.trim();
+    if(!name) return;
+    if(appData.postings[name]) return alert("Posting already exists.");
+    
+    saveState();
+    appData.postings[name] = { a:0, t:0, min:75 };
+    if(Object.keys(appData.postings).length === 1) appData.activePosting = name; // Auto-set first
+    document.getElementById('new-posting-name').value = '';
+    saveData();
+}
+
+function toggleActivePosting(name) {
+    saveState();
+    appData.activePosting = (appData.activePosting === name) ? null : name;
+    saveData();
+}
+
+function deletePosting(name) {
+    if(!confirm(`Permanently delete ${name}?`)) return;
+    saveState();
+    delete appData.postings[name];
+    if(appData.activePosting === name) appData.activePosting = null;
+    saveData();
+}
+
+// UI RENDERING
+function getPerc(a, t) {
+    return t === 0 ? 100 : Math.floor((a/t)*100);
+}
+
+function getColorClass(perc, min) {
+    if(perc >= min) return 'safe';
+    if(perc >= min - 5) return 'warning';
+    return 'shortage';
+}
+
+function renderDashboard() {
+    let totalA = 0, totalT = 0;
+    Object.values(appData.subjects).forEach(sub => {
+        totalA += sub.theory.a + sub.practical.a;
+        totalT += sub.theory.t + sub.practical.t;
+    });
+    Object.values(appData.postings).forEach(pos => {
+        totalA += pos.a; totalT += pos.t;
+    });
+    
+    const overall = getPerc(totalA, totalT);
+    const dashEl = document.getElementById('dash-overall');
+    dashEl.innerText = `${overall}% (${totalA}/${totalT})`;
+    dashEl.className = `percentage ${getColorClass(overall, 75)}`;
+
+    const activeCard = document.getElementById('active-posting-card');
+    const activeContent = document.getElementById('active-posting-content');
+    
+    if(appData.activePosting && appData.postings[appData.activePosting]) {
+        activeCard.style.display = 'block';
+        const p = appData.postings[appData.activePosting];
+        const perc = getPerc(p.a, p.t);
+        activeContent.innerHTML = `
+            <div class="subject-row" style="border:none; margin:0; padding:0;">
+                <div class="stats">
+                    <strong>${appData.activePosting}</strong>
+                    <span>Attended: ${p.a}/${p.t}</span>
+                    <span class="percentage ${getColorClass(perc, 75)}">${perc}%</span>
+                </div>
+                <div class="controls">
+                    <button class="btn-present" onclick="updateAttendance('postings', '${appData.activePosting}', null, true)">+ P</button>
+                    <button class="btn-absent" onclick="updateAttendance('postings', '${appData.activePosting}', null, false)">+ A</button>
+                </div>
+            </div>
+        `;
+    } else {
+        activeCard.style.display = 'none';
+    }
+}
+
+function renderSubjects() {
+    const cont = document.getElementById('subjects-container');
+    let html = '<h2>Subject Attendance</h2>';
+    Object.keys(appData.subjects).forEach(sub => {
+        ['theory', 'practical'].forEach(type => {
+            const data = appData.subjects[sub][type];
+            const perc = getPerc(data.a, data.t);
+            html += `
+            <div class="subject-row">
+                <div class="stats">
+                    <strong>${sub} <span style="font-weight:400; color:var(--text-sec)">(${type === 'theory' ? 'Theory' : 'Practical'})</span></strong>
+                    <span>${data.a} / ${data.t} classes (Target: ${data.min}%)</span>
+                    <span class="percentage ${getColorClass(perc, data.min)}">${perc}%</span>
+                </div>
+                <div class="controls">
+                    <button class="btn-present" onclick="updateAttendance('subjects', '${sub}', '${type}', true)">P</button>
+                    <button class="btn-absent" onclick="updateAttendance('subjects', '${sub}', '${type}', false)">A</button>
+                </div>
+            </div>`;
+        });
+    });
+    cont.innerHTML = html;
+}
+
+function renderPostings() {
+    const cont = document.getElementById('postings-container');
+    let html = '<h2>Clinical Postings</h2>';
+    const keys = Object.keys(appData.postings);
+    
+    if(keys.length === 0) {
+        html += `<p style="color:var(--text-sec); font-size: 14px;">No postings added yet.</p>`;
+    }
+
+    keys.forEach(pos => {
+        const data = appData.postings[pos];
+        const perc = getPerc(data.a, data.t);
+        const isActive = appData.activePosting === pos;
+        
+        html += `
+        <div class="subject-row ${isActive ? 'active-ring' : ''}">
+            <div class="stats">
+                <strong>${pos} ${isActive ? '📌 Active' : ''}</strong>
+                <span>${data.a} / ${data.t} classes</span>
+                <span class="percentage ${getColorClass(perc, 75)}">${perc}%</span>
+                <div>
+                    <button class="btn-small ${isActive ? 'active-btn' : ''}" onclick="toggleActivePosting('${pos}')">${isActive ? 'Unset Active' : 'Set Active'}</button>
+                    <button class="btn-small" style="color:var(--red);" onclick="deletePosting('${pos}')">Delete</button>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn-present" onclick="updateAttendance('postings', '${pos}', null, true)">P</button>
+                <button class="btn-absent" onclick="updateAttendance('postings', '${pos}', null, false)">A</button>
+            </div>
+        </div>`;
+    });
+    cont.innerHTML = html;
+}
+
+function renderCalendarLog() {
+    const dateInput = document.getElementById('cal-date');
+    if(!dateInput.value) dateInput.value = getTodayStr();
+    
+    const logs = appData.calendar[dateInput.value] || [];
+    const logCont = document.getElementById('cal-log-container');
+    
+    if(logs.length === 0) {
+        logCont.innerHTML = '<p style="color:var(--text-sec); text-align:center; padding: 20px 0;">No attendance events logged for this date.</p>';
+        return;
+    }
+    
+    let html = '<ul style="list-style:none;">';
+    [...logs].reverse().forEach(l => {
+        const color = l.status === 'Present' ? 'var(--green)' : 'var(--red)';
+        html += `
+        <li style="background:var(--bg); margin-bottom:8px; padding:12px; border-radius:8px; display:flex; justify-content:space-between;">
+            <div>
+                <div style="font-weight:600; font-size:15px;">${l.name}</div>
+                <div style="font-size:12px; color:var(--text-sec);">${l.time}</div>
+            </div>
+            <div style="color:${color}; font-weight:700;">${l.status}</div>
+        </li>`;
+    });
+    html += '</ul>';
+    logCont.innerHTML = html;
+}
+
+function switchTab(tabId, navElement) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    if(navElement) navElement.classList.add('active');
+    
+    document.getElementById('header-title').innerText = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+    renderAll();
+}
+
+function renderAll() {
+    renderDashboard();
+    renderSubjects();
+    renderPostings();
+    renderCalendarLog();
+}
+
+// SYNC IMPORT/EXPORT
+function exportData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+    const a = document.createElement('a');
+    a.href = dataStr;
+    a.download = `MBBS_Attendance_${getTodayStr()}.json`;
+    a.click();
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if(imported.subjects && imported.postings) {
+                saveState();
+                appData = imported;
+                saveData();
+                alert("Data imported successfully!");
+            } else {
+                alert("Invalid backup file format.");
+            }
+        } catch(err) {
+            alert("Error reading file.");
+        }
+    };
+    reader.readAsText(file);
+}
+
+// SAFETY HOOKS (Ensures saving when app is closed on iOS)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveData(); });
+window.addEventListener('pagehide', saveData);
+
+// INIT APP
+document.getElementById('cal-date').value = getTodayStr();
+renderAll();
+</script>
+</body>
+</html>
